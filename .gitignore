@@ -1,0 +1,5 @@
+# Terraform state and files created by the end-to-end test.
+test/fixtures/**/.terraform/
+test/fixtures/**/.terraform.lock.hcl
+test/fixtures/**/terraform.tfstate*
+test/fixtures/**/managed.txt
