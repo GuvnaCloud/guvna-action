@@ -1,0 +1,126 @@
+name: guvna drift scan
+description: >-
+  Find Terraform drift with guvna. Read-only and local-first: your plans and
+  state never leave the runner, and reports contain names, never values.
+author: Guvna
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  version:
+    description: >-
+      guvna version to install, for example 0.1.0-beta.2. Each release of this
+      action pins a tested default.
+    required: false
+    default: "0.1.0-beta.2"
+  targets:
+    description: >-
+      Directories to scan, one per line. When empty, guvna uses the targets
+      in .guvna.yaml, or discovers root modules under the working directory.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory to run the scan from.
+    required: false
+    default: "."
+  config:
+    description: Path to the config file. Default is .guvna.yaml in the working directory.
+    required: false
+    default: ""
+  fail-on:
+    description: >-
+      Fail the step when drift at or above this severity is found: info, low,
+      medium, high, critical, or none to never fail. Default is the config
+      file's drift.fail_on, otherwise info (any drift fails).
+    required: false
+    default: ""
+  init:
+    description: "When to run terraform init: auto, always or never. Default auto."
+    required: false
+    default: ""
+  concurrency:
+    description: Targets to scan in parallel (1 to 64). Default 4.
+    required: false
+    default: ""
+  timeout:
+    description: Maximum time per target, as a duration such as 30m. Default 30m.
+    required: false
+    default: ""
+  job-summary:
+    description: Write the Markdown report to the job summary.
+    required: false
+    default: "true"
+  verify-signature:
+    description: >-
+      Verify the release's Sigstore signature with cosign before installing
+      (recommended). The SHA-256 checksum is always verified.
+    required: false
+    default: "true"
+  allow-pull-request-target:
+    description: >-
+      Allow running on pull_request_target. Off by default: that event can
+      run untrusted code with your secrets. See the README before enabling.
+    required: false
+    default: "false"
+
+outputs:
+  exit-code:
+    description: "guvna's exit code: 0 no drift at or above fail-on, 1 error, 2 drift found."
+    value: ${{ steps.scan.outputs.exit-code }}
+  drift-found:
+    description: "true when the scan reported at least one finding."
+    value: ${{ steps.scan.outputs.drift-found }}
+  findings:
+    description: Number of findings reported.
+    value: ${{ steps.scan.outputs.findings }}
+  report-json:
+    description: Path to the JSON report (schema findings.v1.json).
+    value: ${{ steps.scan.outputs.report-json }}
+  report-markdown:
+    description: Path to the Markdown report.
+    value: ${{ steps.scan.outputs.report-markdown }}
+
+runs:
+  using: composite
+  steps:
+    # Every input reaches the scripts as an environment variable, never by
+    # template expansion inside a script, so inputs cannot inject commands.
+    - name: Check inputs
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_TARGETS: ${{ inputs.targets }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_INIT: ${{ inputs.init }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_JOB_SUMMARY: ${{ inputs.job-summary }}
+        INPUT_VERIFY_SIGNATURE: ${{ inputs.verify-signature }}
+        INPUT_ALLOW_PULL_REQUEST_TARGET: ${{ inputs.allow-pull-request-target }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/check.sh"
+
+    - name: Install cosign
+      if: inputs.verify-signature == 'true'
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+    - name: Install guvna (verified)
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_VERIFY_SIGNATURE: ${{ inputs.verify-signature }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/install.sh"
+
+    - name: Scan for drift
+      id: scan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_TARGETS: ${{ inputs.targets }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_INIT: ${{ inputs.init }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_JOB_SUMMARY: ${{ inputs.job-summary }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/scan.sh"
