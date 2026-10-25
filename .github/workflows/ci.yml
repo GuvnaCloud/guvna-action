@@ -101,7 +101,7 @@ jobs:
 
       - name: Scan, reporting only (fail-on none)
         id: report
-        uses: ./
+        uses: $/
         with:
           targets: test/fixtures/drift
           fail-on: none
@@ -131,7 +131,7 @@ jobs:
       - name: Scan as a gate (fail-on info must fail the step)
         id: gate
         continue-on-error: true
-        uses: ./
+        uses: $/
         with:
           targets: test/fixtures/drift
           fail-on: info
