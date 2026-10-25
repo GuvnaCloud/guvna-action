@@ -42,8 +42,11 @@ jobs:
           echo "${ZIZMOR_SHA256}  zizmor.tar.gz" | sha256sum -c -
           tar -xzf zizmor.tar.gz -C bin
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # actionlint 1.7.12 predates GitHub's self-repository syntax ("uses: $/",
+      # July 2026) and rejects it. Ignore only that message; zizmor requires
+      # the syntax. Drop the -ignore once actionlint supports it.
       - name: actionlint (workflows, with shellcheck)
-        run: actionlint -color
+        run: actionlint -color -ignore 'specifying action "\$/" in invalid format'
       - name: zizmor (Actions security audit, action and workflows)
         run: zizmor --offline --persona=auditor --min-severity=low .
       - name: shellcheck (scripts)
